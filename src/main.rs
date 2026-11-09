@@ -72,7 +72,7 @@ ENVIRONMENT:
     HENRRI_TIMEOUT_SECS      Per-request timeout. Default 30.
     HENRRI_PDF_TIMEOUT_SECS  Timeout of the PDF routes. Default 120.
     HENRRI_MAX_RETRIES       Retries on the rate limiter, 503 and busy finalization. Default 3.
-    HENRRI_DOWNLOAD_DIR      Where PDFs are saved. Default: <temp>/henrri.
+    HENRRI_DOWNLOAD_DIR      Where PDFs are saved. Default: a per-user cache directory.
     HENRRI_WEBHOOK_SECRET    The webhook signing secret, to verify deliveries.
     HENRRI_HTTP_BIND         Listen address for the HTTP transport.
     HENRRI_HTTP_TOKEN        Bearer token the HTTP transport requires.
@@ -384,7 +384,13 @@ async fn check(config: Config) -> Result<()> {
             "no HENRRI_WEBHOOK_SECRET"
         }
     );
-    println!("downloads    {}", config.download_dir.display());
+    println!(
+        "downloads    {}",
+        config.download_dir.as_ref().map_or_else(
+            || "none: set HENRRI_DOWNLOAD_DIR to save PDFs".to_owned(),
+            |d| d.display().to_string()
+        )
+    );
 
     let server = HenrriServer::new(config)?;
     println!("tools        {}", server.tools().len());
