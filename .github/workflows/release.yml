@@ -18,7 +18,7 @@ jobs:
     name: tag · changelog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Tag matches Cargo.toml
         run: |
           version=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
@@ -51,7 +51,7 @@ jobs:
           - { target: x86_64-pc-windows-msvc, os: windows-latest }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -94,7 +94,7 @@ jobs:
       DOCKER_BUILD_RECORD_UPLOAD: false
       DOCKER_BUILD_SUMMARY: false
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -128,7 +128,7 @@ jobs:
       MCP_PUBLISHER_VERSION: v1.8.1
       MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Install mcp-publisher (pinned, checksum verified)
         run: |
           curl -fsSL -o mcp-publisher.tar.gz \
