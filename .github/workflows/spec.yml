@@ -20,7 +20,7 @@ jobs:
       matrix:
         environment: [production, sandbox]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Compare the live operations with spec/operations.tsv
         run: |
           scripts/spec-operations.sh ${{ matrix.environment }} > live.tsv
