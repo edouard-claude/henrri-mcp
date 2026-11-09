@@ -1,0 +1,27 @@
+name: Henrri spec
+
+# Fails when the live Henrri v1 specification, production or sandbox, no
+# longer matches spec/operations.tsv: an operation was added, removed or
+# renamed, and src/coverage.rs needs a look.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  push:
+    branches: [main]
+    paths: ["spec/**", "scripts/spec-operations.sh"]
+  workflow_dispatch:
+
+jobs:
+  drift:
+    name: ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [production, sandbox]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compare the live operations with spec/operations.tsv
+        run: |
+          scripts/spec-operations.sh ${{ matrix.environment }} > live.tsv
+          diff -u spec/operations.tsv live.tsv

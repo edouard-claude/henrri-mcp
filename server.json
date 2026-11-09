@@ -1,0 +1,68 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.edouard-claude/henrri-mcp",
+  "title": "Henrri (unofficial)",
+  "description": "Unofficial Henrri invoicing: customers, quotes, invoices, milestones, payments, webhooks.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/edouard-claude/henrri-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/edouard-claude/henrri-mcp",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/edouard-claude/henrri-mcp:0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "HENRRI_USERNAME",
+          "description": "Henrri API user login (or set HENRRI_CLIENT_ID and HENRRI_CLIENT_SECRET)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "HENRRI_PASSWORD",
+          "description": "Henrri API user password",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "HENRRI_CLIENT_ID",
+          "description": "Developer client id, instead of a user",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "HENRRI_CLIENT_SECRET",
+          "description": "Developer client secret",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "HENRRI_ENVIRONMENT",
+          "description": "production or sandbox",
+          "default": "production",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "HENRRI_READ_ONLY",
+          "description": "1 to withhold every write tool (finalize, pay, delete…)",
+          "default": "0",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "HENRRI_TOOLSETS",
+          "description": "Comma-separated toolsets: account, customers, documents, catalog, payments, revenues, webhooks",
+          "default": "all",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

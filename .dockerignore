@@ -1,0 +1,16 @@
+target
+.git
+.github
+.claude
+.env
+.env.*
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+LICENSE
+Dockerfile
+.dockerignore
+.DS_Store
+tests
+scripts
