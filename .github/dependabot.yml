@@ -11,3 +11,7 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # The MSRV job pins dtolnay/rust-toolchain@1.88 on purpose: that tag is
+      # the minimum supported Rust version, not an outdated action.
+      - dependency-name: dtolnay/rust-toolchain
