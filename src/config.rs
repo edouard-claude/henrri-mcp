@@ -200,8 +200,10 @@ pub struct Config {
     pub pdf_timeout: Duration,
     /// How many times a transient failure is retried.
     pub max_retries: u32,
-    /// Where PDF files are written.
-    pub download_dir: PathBuf,
+    /// Where PDF files are written: `HENRRI_DOWNLOAD_DIR`, or the user's
+    /// cache directory. `None` when neither exists; the PDF tools then refuse
+    /// rather than fall back to a shared, guessable temp path.
+    pub download_dir: Option<PathBuf>,
     /// The secret Henrri signs webhook deliveries with.
     pub webhook_secret: Option<Secret>,
     /// Listen address for the Streamable HTTP transport, when not stdio.
@@ -293,7 +295,8 @@ impl Config {
         }
 
         let download_dir = get_trimmed("HENRRI_DOWNLOAD_DIR")
-            .map_or_else(|| default_download_dir(&get), PathBuf::from);
+            .map(PathBuf::from)
+            .or_else(|| default_download_dir(&get));
 
         Ok(Self {
             credentials,
@@ -339,23 +342,18 @@ impl Config {
 }
 
 /// A per-user directory for PDFs, never the shared temp directory: the
-/// platform's cache directory, then the home directory.
-fn default_download_dir(get: &impl Fn(&str) -> Option<String>) -> PathBuf {
+/// platform's cache directory, under the home directory.
+fn default_download_dir(get: &impl Fn(&str) -> Option<String>) -> Option<PathBuf> {
     let var = |key: &str| get(key).filter(|v| !v.trim().is_empty()).map(PathBuf::from);
     if cfg!(windows) {
-        if let Some(local) = var("LOCALAPPDATA") {
-            return local.join("mcp-henrri").join("downloads");
-        }
+        var("LOCALAPPDATA").map(|local| local.join("mcp-henrri").join("downloads"))
     } else if cfg!(target_os = "macos") {
-        if let Some(home) = var("HOME") {
-            return home.join("Library/Caches/mcp-henrri/downloads");
-        }
-    } else if let Some(cache) = var("XDG_CACHE_HOME") {
-        return cache.join("mcp-henrri/downloads");
-    } else if let Some(home) = var("HOME") {
-        return home.join(".cache/mcp-henrri/downloads");
+        var("HOME").map(|home| home.join("Library/Caches/mcp-henrri/downloads"))
+    } else {
+        var("XDG_CACHE_HOME")
+            .map(|cache| cache.join("mcp-henrri/downloads"))
+            .or_else(|| var("HOME").map(|home| home.join(".cache/mcp-henrri/downloads")))
     }
-    std::env::temp_dir().join(format!("mcp-henrri-{}", std::process::id()))
 }
 
 /// Pick the authentication method from what is set, and refuse half of one.
@@ -549,8 +547,13 @@ mod tests {
             ("LOCALAPPDATA", "C:/Users/ada/AppData/Local"),
         ])))
         .unwrap();
-        let dir = cfg.download_dir.display().to_string();
+        let dir = cfg.download_dir.unwrap().display().to_string();
         assert!(dir.contains("ada") && dir.contains("mcp-henrri"), "{dir}");
+        let homeless = Config::from_getter(env(&USER)).unwrap();
+        assert!(
+            homeless.download_dir.is_none(),
+            "no guessable shared fallback"
+        );
     }
 
     #[test]

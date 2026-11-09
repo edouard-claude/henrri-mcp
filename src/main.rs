@@ -384,7 +384,13 @@ async fn check(config: Config) -> Result<()> {
             "no HENRRI_WEBHOOK_SECRET"
         }
     );
-    println!("downloads    {}", config.download_dir.display());
+    println!(
+        "downloads    {}",
+        config.download_dir.as_ref().map_or_else(
+            || "none: set HENRRI_DOWNLOAD_DIR to save PDFs".to_owned(),
+            |d| d.display().to_string()
+        )
+    );
 
     let server = HenrriServer::new(config)?;
     println!("tools        {}", server.tools().len());

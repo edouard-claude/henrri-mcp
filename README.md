@@ -193,7 +193,7 @@ stops the process with a message naming it.
 | `HENRRI_TIMEOUT_SECS` | `30` | Per-request timeout. |
 | `HENRRI_PDF_TIMEOUT_SECS` | `120` | Timeout of the PDF routes, which render on demand. |
 | `HENRRI_MAX_RETRIES` | `3` | Retries on the rate limiter, `503` and busy finalizations. |
-| `HENRRI_DOWNLOAD_DIR` | per-user cache | Where PDFs are saved (`~/Library/Caches/mcp-henrri/downloads`, `~/.cache/…`, `%LOCALAPPDATA%\…`). Created `0700`; files written without following links. |
+| `HENRRI_DOWNLOAD_DIR` | per-user cache | Where PDFs are saved (`~/Library/Caches/mcp-henrri/downloads`, `~/.cache/…`, `%LOCALAPPDATA%\…`). Created `0700`, refused if others can write to it; no shared temp fallback. |
 | `HENRRI_WEBHOOK_SECRET` | | The signing secret from Henrri's webhook settings. |
 | `HENRRI_HTTP_BIND` | | Serve HTTP on this address instead of stdio (same as `--http`). |
 | `HENRRI_HTTP_TOKEN` | | Bearer token the HTTP transport requires; mandatory off loopback. |

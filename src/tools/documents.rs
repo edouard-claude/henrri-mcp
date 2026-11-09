@@ -374,7 +374,11 @@ impl HenrriServer {
                 .unwrap_or(&fallback),
             &fallback,
         );
-        let dir = self.config().download_dir.clone();
+        let Some(dir) = self.config().download_dir.clone() else {
+            return Err(Error::invalid(
+                "no download directory: set HENRRI_DOWNLOAD_DIR (no HOME or cache directory was found, and a shared temp directory is not used)",
+            ));
+        };
         let path = dir.join(&name);
         let bytes = response.bytes;
         let size = bytes.len();
@@ -397,7 +401,8 @@ impl HenrriServer {
 
 /// Write `bytes` at `path` inside `dir` without ever following a link an
 /// other user could have planted: the directory is created private (0700 on
-/// Unix) and must not be a symlink, and the file is written to a fresh name
+/// Unix) and must be neither a symlink nor writable by other users, and the
+/// file is written to a fresh name
 /// (`create_new`, which refuses anything already there) then renamed into
 /// place, which replaces a link rather than writing through it.
 fn write_private(dir: &Path, path: &Path, bytes: &[u8]) -> crate::error::Result<()> {
@@ -414,13 +419,18 @@ fn write_private(dir: &Path, path: &Path, bytes: &[u8]) -> crate::error::Result<
     #[cfg(unix)]
     std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
     builder.create(dir).map_err(io(dir))?;
-    if std::fs::symlink_metadata(dir)
-        .map_err(io(dir))?
-        .file_type()
-        .is_symlink()
-    {
+    let meta = std::fs::symlink_metadata(dir).map_err(io(dir))?;
+    if meta.file_type().is_symlink() {
         return Err(Error::invalid(format!(
             "the download directory {} is a symbolic link: set HENRRI_DOWNLOAD_DIR to a real directory",
+            dir.display()
+        )));
+    }
+    // Another user able to write in the directory could swap entries in it.
+    #[cfg(unix)]
+    if std::os::unix::fs::PermissionsExt::mode(&meta.permissions()) & 0o022 != 0 {
+        return Err(Error::invalid(format!(
+            "the download directory {} is writable by other users: use a private directory (chmod go-w, or another HENRRI_DOWNLOAD_DIR)",
             dir.display()
         )));
     }
@@ -1094,6 +1104,24 @@ mod tests {
         );
         assert_eq!(safe_file_name("..", "document-9.pdf"), "document-9.pdf");
         assert_eq!(safe_file_name("a:b|c", "d.pdf"), "a_b_c.pdf");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_shared_download_directory_is_refused_and_a_private_one_used() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let base = std::env::temp_dir().join(format!("mcp-henrri-unit-{}", std::process::id()));
+        let private = base.join("private");
+        write_private(&private, &private.join("a.pdf"), b"%PDF").unwrap();
+        assert_eq!(std::fs::read(private.join("a.pdf")).unwrap(), b"%PDF");
+        let mode = std::fs::metadata(&private).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o700);
+        let shared = base.join("shared");
+        std::fs::create_dir_all(&shared).unwrap();
+        std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o777)).unwrap();
+        let err = write_private(&shared, &shared.join("a.pdf"), b"%PDF").unwrap_err();
+        assert!(err.to_string().contains("writable by other users"), "{err}");
+        let _ = std::fs::remove_dir_all(base);
     }
 
     #[test]
