@@ -293,7 +293,7 @@ impl Config {
         }
 
         let download_dir = get_trimmed("HENRRI_DOWNLOAD_DIR")
-            .map_or_else(|| std::env::temp_dir().join("henrri"), PathBuf::from);
+            .map_or_else(|| default_download_dir(&get), PathBuf::from);
 
         Ok(Self {
             credentials,
@@ -336,6 +336,26 @@ impl Config {
     pub fn read_only(&self) -> bool {
         self.access == Access::ReadOnly
     }
+}
+
+/// A per-user directory for PDFs, never the shared temp directory: the
+/// platform's cache directory, then the home directory.
+fn default_download_dir(get: &impl Fn(&str) -> Option<String>) -> PathBuf {
+    let var = |key: &str| get(key).filter(|v| !v.trim().is_empty()).map(PathBuf::from);
+    if cfg!(windows) {
+        if let Some(local) = var("LOCALAPPDATA") {
+            return local.join("mcp-henrri").join("downloads");
+        }
+    } else if cfg!(target_os = "macos") {
+        if let Some(home) = var("HOME") {
+            return home.join("Library/Caches/mcp-henrri/downloads");
+        }
+    } else if let Some(cache) = var("XDG_CACHE_HOME") {
+        return cache.join("mcp-henrri/downloads");
+    } else if let Some(home) = var("HOME") {
+        return home.join(".cache/mcp-henrri/downloads");
+    }
+    std::env::temp_dir().join(format!("mcp-henrri-{}", std::process::id()))
 }
 
 /// Pick the authentication method from what is set, and refuse half of one.
@@ -519,6 +539,18 @@ mod tests {
         assert_eq!(cfg.pdf_timeout, Duration::from_secs(120));
         assert_eq!(cfg.max_retries, 3);
         assert!(cfg.webhook_secret.is_none());
+    }
+
+    #[test]
+    fn pdfs_default_to_a_per_user_directory() {
+        let cfg = Config::from_getter(env(&with(&[
+            ("HOME", "/home/ada"),
+            ("XDG_CACHE_HOME", "/home/ada/.cache"),
+            ("LOCALAPPDATA", "C:/Users/ada/AppData/Local"),
+        ])))
+        .unwrap();
+        let dir = cfg.download_dir.display().to_string();
+        assert!(dir.contains("ada") && dir.contains("mcp-henrri"), "{dir}");
     }
 
     #[test]

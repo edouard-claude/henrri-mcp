@@ -6,7 +6,7 @@
 //! Finalizing an accounting document (invoice, credit note) costs 8 credits
 //! and can never be undone: anti-fraud rules forbid deleting it afterwards.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chrono::{Local, Offset};
 use rmcp::{Json, handler::server::wrapper::Parameters};
@@ -374,28 +374,72 @@ impl HenrriServer {
                 .unwrap_or(&fallback),
             &fallback,
         );
-        let dir = &self.config().download_dir;
-        tokio::fs::create_dir_all(dir)
+        let dir = self.config().download_dir.clone();
+        let path = dir.join(&name);
+        let bytes = response.bytes;
+        let size = bytes.len();
+        let written = path.clone();
+        tokio::task::spawn_blocking(move || write_private(&dir, &written, &bytes))
             .await
-            .map_err(|source| Error::Io {
-                path: dir.display().to_string(),
-                source,
-            })?;
-        let path: PathBuf = dir.join(&name);
-        tokio::fs::write(&path, &response.bytes)
-            .await
-            .map_err(|source| Error::Io {
+            .map_err(|e| Error::Io {
                 path: path.display().to_string(),
-                source,
-            })?;
+                source: std::io::Error::other(e),
+            })??;
         Ok(SavedFile {
             path: path.display().to_string(),
             file_name: name,
-            bytes: response.bytes.len(),
+            bytes: size,
             content_type: response.content_type,
             resource_uri: format!("henrri://documents/{document_id}/pdf"),
         })
     }
+}
+
+/// Write `bytes` at `path` inside `dir` without ever following a link an
+/// other user could have planted: the directory is created private (0700 on
+/// Unix) and must not be a symlink, and the file is written to a fresh name
+/// (`create_new`, which refuses anything already there) then renamed into
+/// place, which replaces a link rather than writing through it.
+fn write_private(dir: &Path, path: &Path, bytes: &[u8]) -> crate::error::Result<()> {
+    use std::io::Write as _;
+    let io = |p: &Path| {
+        let shown = p.display().to_string();
+        move |source| Error::Io {
+            path: shown,
+            source,
+        }
+    };
+    let mut builder = std::fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder.create(dir).map_err(io(dir))?;
+    if std::fs::symlink_metadata(dir)
+        .map_err(io(dir))?
+        .file_type()
+        .is_symlink()
+    {
+        return Err(Error::invalid(format!(
+            "the download directory {} is a symbolic link: set HENRRI_DOWNLOAD_DIR to a real directory",
+            dir.display()
+        )));
+    }
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let partial = dir.join(format!(".download-{}-{nonce}.part", std::process::id()));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let mut file = options.open(&partial).map_err(io(&partial))?;
+    let written = file.write_all(bytes).and_then(|()| file.sync_all());
+    drop(file);
+    if let Err(source) = written.and_then(|()| std::fs::rename(&partial, path)) {
+        let _ = std::fs::remove_file(&partial);
+        return Err(io(path)(source));
+    }
+    Ok(())
 }
 
 /// Replace a human date in a body by the datetime the API wants.
@@ -489,10 +533,12 @@ impl HenrriServer {
 
     /// The next batch of up to 50 finalized quotes, after the last one this
     /// API account was given. Henrri keeps the cursor: each call moves it
-    /// forward, so two calls never return the same quotes. Meant for a sync.
+    /// forward, so two calls never return the same quotes, which is why this
+    /// read counts as a write and is withheld in read-only mode. For a sync.
     #[rmcp::tool(annotations(
         title = "Fetch the next quote batch",
-        read_only_hint = true,
+        read_only_hint = false,
+        destructive_hint = false,
         idempotent_hint = false,
         open_world_hint = true
     ))]
