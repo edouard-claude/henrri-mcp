@@ -193,7 +193,7 @@ stops the process with a message naming it.
 | `HENRRI_TIMEOUT_SECS` | `30` | Per-request timeout. |
 | `HENRRI_PDF_TIMEOUT_SECS` | `120` | Timeout of the PDF routes, which render on demand. |
 | `HENRRI_MAX_RETRIES` | `3` | Retries on the rate limiter, `503` and busy finalizations. |
-| `HENRRI_DOWNLOAD_DIR` | `<temp>/henrri` | Where PDFs are saved. |
+| `HENRRI_DOWNLOAD_DIR` | per-user cache | Where PDFs are saved (`~/Library/Caches/mcp-henrri/downloads`, `~/.cache/…`, `%LOCALAPPDATA%\…`). Created `0700`, refused if others can write to it; no shared temp fallback. |
 | `HENRRI_WEBHOOK_SECRET` | | The signing secret from Henrri's webhook settings. |
 | `HENRRI_HTTP_BIND` | | Serve HTTP on this address instead of stdio (same as `--http`). |
 | `HENRRI_HTTP_TOKEN` | | Bearer token the HTTP transport requires; mandatory off loopback. |
@@ -284,7 +284,7 @@ exposes. **R** reads, **W** writes, **D** is destructive or irreversible and nee
 | `get_document_pdf` | R | `GET /v1/documents/{id}/pdf` — saved to disk, Factur-X option |
 | `create_document_pdf_url` | W | `POST /v1/documents/{id}/pdf/url` |
 | `download_document_pdf_file` | R | `GET /v1/documents/{id}/pdf/files/{guid}` |
-| `next_quote_batch` | R | `GET /v1/documents/next-quote-batch` — moves a server-side cursor |
+| `next_quote_batch` | W | `GET /v1/documents/next-quote-batch` — moves a server-side cursor |
 | `list_document_types` | R | `GET /v1/documenttypes` |
 | `list_document_lines` | R | `GET /v1/documents/{documentId}/lines` |
 | `add_document_line` | W | `POST /v1/documents/{documentId}/lines` — `kind` resolved to the type id |
